@@ -1,4 +1,4 @@
-import "../styles/ui.css";
+import "../../styles/ui.css";
 
 /**
  * Card — superficie elevada genérica.

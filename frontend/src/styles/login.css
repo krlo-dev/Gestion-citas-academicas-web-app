@@ -1,0 +1,114 @@
+/* ── LoginPage ──────────────────────────────────────────────────── */
+.login-screen {
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--primary-xdark) 0%, #1e293b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.login-box {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* Header del login */
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+  color: #fff;
+}
+
+.login-header__emoji {
+  font-size: 52px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+.login-header__title {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.login-header__subtitle {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 14px;
+  margin-top: 6px;
+}
+
+/* Card del formulario */
+.login-card {
+  padding: 28px;
+}
+
+/* Selector de rol */
+.role-selector {
+  margin-bottom: 24px;
+}
+
+.role-selector__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.role-selector__options {
+  display: flex;
+  gap: 8px;
+}
+
+.role-btn {
+  flex: 1;
+  padding: 10px 6px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.role-btn:hover {
+  border-color: var(--primary);
+}
+
+.role-btn.active {
+  border-color: var(--primary-dark);
+  background: var(--primary-light);
+}
+
+.role-btn__icon  { font-size: 20px; }
+
+.role-btn__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.role-btn.active .role-btn__label {
+  color: var(--primary-dark);
+}
+
+/* Campos del formulario */
+.login-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Hint de contraseña */
+.login-hint {
+  font-size: 12px;
+  color: var(--text-light);
+  text-align: center;
+  margin-top: 16px;
+}

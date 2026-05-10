@@ -1,0 +1,243 @@
+/* ── Vista Estudiante ───────────────────────────────────────────── */
+
+/* Grilla de asignaturas */
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.subject-card {
+  padding: 18px 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: #fff;
+  cursor: pointer;
+  text-align: center;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.subject-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Estado seleccionado — el color dinámico se aplica via inline style */
+.subject-card.selected {
+  box-shadow: var(--shadow-md);
+}
+
+.subject-card__icon {
+  font-size: 28px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.subject-card__name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Título de paso */
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-badge--active   { background: var(--primary-dark); }
+.step-badge--inactive { background: var(--border); }
+
+.step-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Grilla de docentes con horarios */
+.teacher-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.teacher-card {
+  padding: 18px;
+}
+
+.teacher-card--selected {
+  border-color: var(--primary-dark) !important;
+}
+
+.teacher-card__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.teacher-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.teacher-card__name {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 15px;
+}
+
+.teacher-card__email {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.slots-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+/* Botones de horario */
+.slots-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.slot-btn {
+  padding: 5px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  background: #fff;
+  color: var(--text-muted);
+  transition: all 0.1s;
+  font-family: inherit;
+}
+
+.slot-btn:hover:not(.slot-btn--taken):not(.slot-btn--selected) {
+  border-color: var(--primary);
+  color: var(--primary-dark);
+}
+
+.slot-btn--selected {
+  border-color: var(--primary-dark);
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+.slot-btn--taken {
+  border-color: var(--danger-border);
+  background: var(--danger-light);
+  color: #fca5a5;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+/* Panel de confirmación */
+.confirm-panel {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.confirm-panel__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-xdark);
+}
+
+.confirm-panel__detail {
+  font-size: 13px;
+  color: var(--primary-dark);
+  margin-top: 2px;
+}
+
+/* Lista de mis citas */
+.appt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appt-row {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  /* border-left color applied via inline style */
+}
+
+.appt-row--cancelled {
+  opacity: 0.6;
+}
+
+.appt-row__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.appt-row__icon { font-size: 24px; }
+
+.appt-row__name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.appt-row__meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.appt-row__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Sección de título de vista */
+.view-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+}

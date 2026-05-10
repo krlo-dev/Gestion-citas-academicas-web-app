@@ -1,0 +1,264 @@
+/* ── Vista Administrador ────────────────────────────────────────── */
+
+/* Métricas de resumen */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.metric-card {
+  padding: 20px;
+  /* border-left color via inline style */
+}
+
+.metric-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.metric-card__label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.metric-card__icon { font-size: 28px; }
+
+/* Citas recientes en el resumen */
+.recent-card { padding: 24px; }
+
+.recent-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.recent-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.recent-row__left {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.recent-row__icon { font-size: 20px; }
+
+.recent-row__names {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recent-row__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Layout de dos columnas para asignaturas y docentes */
+.two-col-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .two-col-grid { grid-template-columns: 1fr; }
+}
+
+/* Formulario de agregar */
+.form-card { padding: 22px; }
+
+.form-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 18px;
+}
+
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Selector de iconos */
+.icon-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.icon-option {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: #fff;
+  cursor: pointer;
+  font-size: 18px;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.icon-option:hover    { border-color: var(--primary); }
+.icon-option.selected {
+  border-color: var(--primary-dark);
+  background: var(--primary-light);
+}
+
+/* Selector de colores */
+.color-picker {
+  display: flex;
+  gap: 6px;
+}
+
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 3px solid transparent;
+  transition: border-color 0.1s;
+  /* background y border-color selected vía inline style */
+}
+
+/* Lista lateral de elementos */
+.items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.items-list__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.item-row {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* border-left via inline style */
+}
+
+.item-row__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.item-row__icon { font-size: 22px; }
+
+.item-row__name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.item-row__sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* Docente avatar en lista admin */
+.admin-teacher-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* Todas las citas */
+.all-appts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.all-appts-header__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.all-appts-header__badges {
+  display: flex;
+  gap: 10px;
+}
+
+.all-appts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.all-appt-row {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  transition: opacity 0.2s;
+  /* border-left via inline style */
+}
+
+.all-appt-row--cancelled { opacity: 0.65; }
+
+.all-appt-row__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.all-appt-row__icon { font-size: 22px; }
+
+.all-appt-row__names {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.all-appt-row__meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.all-appt-row__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
