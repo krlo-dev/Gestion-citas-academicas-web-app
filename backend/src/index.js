@@ -8,6 +8,7 @@ import catalogosRouter from './routes/catalogos.routes.js';
 import usuariosRouter from './routes/usuarios.routes.js';
 import horariosRouter from './routes/horarios.routes.js';
 import citasRouter from './routes/citas.routes.js';
+import authRouter from './routes/auth.routes.js';
 
 dotenv.config();
 
@@ -32,7 +33,7 @@ app.use('/api/catalogos', catalogosRouter);
 app.use('/api/usuarios', usuariosRouter);
 app.use('/api/horarios', horariosRouter);
 app.use('/api/citas', citasRouter);
-
+app.use('/api/auth', authRouter);
 // Manejador global de errores
 app.use((err, _req, res, _next) => {
     console.error(err);
