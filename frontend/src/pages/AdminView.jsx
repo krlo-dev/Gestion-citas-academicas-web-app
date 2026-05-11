@@ -1,259 +1,264 @@
-import { useState } from "react";
-import { ICON_OPTIONS, COLOR_OPTIONS } from "../data/constants";
-import Header from "../components/Header";
-import Card   from "../components/ui/Card";
-import Badge  from "../components/ui/Badge";
-import Btn    from "../components/ui/Btn";
-import Input  from "../components/ui/Input";
-import Select from "../components/ui/Select";
+/**
+ * AdminView.jsx — Panel del administrador.
+ *
+ * Endpoints usados:
+ *   GET/POST/PUT/DELETE /api/usuarios
+ *   GET/POST/DELETE     /api/horarios
+ *   GET/PUT/DELETE      /api/citas
+ *   GET                 /api/catalogos/roles
+ *   GET                 /api/catalogos/materias
+ */
+import { useState, useEffect } from "react";
+import { useAuth }    from "../context/AuthContext";
+import {
+  getUsuarios, createUsuario, deleteUsuario,
+  getHorarios, createHorario, deleteHorario,
+  getCitas, updateCita, deleteCita,
+  getRoles, getMaterias,
+} from "../services/api";
+import Header  from "../components/Header";
+import Card    from "../components/ui/Card";
+import Badge   from "../components/ui/Badge";
+import Btn     from "../components/ui/Btn";
+import Input   from "../components/ui/Input";
+import Select  from "../components/ui/Select";
+import Spinner from "../components/ui/Spinner";
 import "../styles/admin.css";
 
-const EMPTY_SUBJECT = { name: "", icon: "📚", color: "#3b82f6", bg: "#eff6ff" };
-const EMPTY_TEACHER = { name: "", email: "", subjectId: "" };
+const ID_ESTADO_CANCELADA = 3;
+const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-/**
- * AdminView — panel del administrador con 4 pestañas:
- * Resumen | Asignaturas | Docentes | Todas las citas
- */
-export default function AdminView({
-  user,
-  subjects, setSubjects,
-  teachers, setTeachers,
-  appointments, setAppointments,
-  onLogout,
-}) {
-  const [tab,          setTab]          = useState("overview");
-  const [newSubject,   setNewSubject]   = useState(EMPTY_SUBJECT);
-  const [newTeacher,   setNewTeacher]   = useState(EMPTY_TEACHER);
+const EMPTY_USER    = { nombre: "", email: "", password: "", id_rol: "" };
+const EMPTY_HORARIO = { id_docente: "", id_materia: "", dia_semana: "", hora_inicio: "", hora_fin: "" };
+
+export default function AdminView() {
+  const { user, logout } = useAuth();
+  const [tab, setTab]    = useState("overview");
+
+  // Catálogos
+  const [roles,    setRoles]    = useState([]);
+  const [materias, setMaterias] = useState([]);
+
+  // Datos principales
+  const [usuarios,  setUsuarios]  = useState([]);
+  const [horarios,  setHorarios]  = useState([]);
+  const [citas,     setCitas]     = useState([]);
+
+  // Formularios
+  const [newUser,    setNewUser]    = useState(EMPTY_USER);
+  const [newHorario, setNewHorario] = useState(EMPTY_HORARIO);
+
+  // UI
+  const [loading,      setLoading]      = useState(true);
   const [notification, setNotification] = useState("");
+  const [error,        setError]        = useState("");
+
+  useEffect(() => { loadAll(); }, []);
+
+  async function loadAll() {
+    setLoading(true);
+    try {
+      const [r, m, u, h, c] = await Promise.all([
+        getRoles(), getMaterias(), getUsuarios(), getHorarios(), getCitas(),
+      ]);
+      setRoles(r); setMaterias(m); setUsuarios(u); setHorarios(h); setCitas(c);
+    } catch (err) {
+      setError(err.message ?? "Error al cargar los datos.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function notify(msg) {
     setNotification(msg);
     setTimeout(() => setNotification(""), 3500);
   }
 
-  /* ── Operaciones de asignaturas ──────────────────────────────── */
-  function addSubject() {
-    if (!newSubject.name.trim()) return;
-    setSubjects((prev) => [...prev, { ...newSubject, id: Date.now() }]);
-    setNewSubject(EMPTY_SUBJECT);
-    notify("✅ Asignatura añadida correctamente");
+  // ── Usuarios ────────────────────────────────────────────────────
+  async function handleCreateUser() {
+    const { nombre, email, password, id_rol } = newUser;
+    if (!nombre || !email || !password || !id_rol) {
+      setError("Completa todos los campos del formulario.");
+      return;
+    }
+    try {
+      await createUsuario({ nombre, email, password, id_rol: parseInt(id_rol) });
+      setNewUser(EMPTY_USER);
+      notify("✅ Usuario creado correctamente");
+      const u = await getUsuarios();
+      setUsuarios(u);
+    } catch (err) { setError(err.message); }
   }
 
-  function deleteSubject(id) {
-    setSubjects((prev) => prev.filter((s) => s.id !== id));
-    notify("🗑️ Asignatura eliminada");
+  async function handleDeleteUser(id) {
+    if (!confirm("¿Eliminar este usuario?")) return;
+    try {
+      await deleteUsuario(id);
+      notify("🗑️ Usuario eliminado");
+      setUsuarios((prev) => prev.filter((u) => u.id !== id));
+    } catch (err) { setError(err.message); }
   }
 
-  /* ── Operaciones de docentes ─────────────────────────────────── */
-  function addTeacher() {
-    const { name, email, subjectId } = newTeacher;
-    if (!name.trim() || !email.trim() || !subjectId) return;
-    const initials = name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-    setTeachers((prev) => [
-      ...prev,
-      { ...newTeacher, id: Date.now(), subjectId: parseInt(subjectId), initials },
-    ]);
-    setNewTeacher(EMPTY_TEACHER);
-    notify("✅ Docente añadido correctamente");
+  // ── Horarios ────────────────────────────────────────────────────
+  async function handleCreateHorario() {
+    const { id_docente, id_materia, dia_semana, hora_inicio, hora_fin } = newHorario;
+    if (!id_docente || !id_materia || !dia_semana || !hora_inicio || !hora_fin) {
+      setError("Completa todos los campos del horario.");
+      return;
+    }
+    try {
+      await createHorario({
+        id_docente: parseInt(id_docente),
+        id_materia: parseInt(id_materia),
+        dia_semana: parseInt(dia_semana),
+        hora_inicio, hora_fin,
+      });
+      setNewHorario(EMPTY_HORARIO);
+      notify("✅ Horario creado correctamente");
+      const h = await getHorarios();
+      setHorarios(h);
+    } catch (err) { setError(err.message); }
   }
 
-  function deleteTeacher(id) {
-    setTeachers((prev) => prev.filter((t) => t.id !== id));
-    notify("🗑️ Docente eliminado");
+  async function handleDeleteHorario(id) {
+    if (!confirm("¿Eliminar este horario?")) return;
+    try {
+      await deleteHorario(id);
+      notify("🗑️ Horario eliminado");
+      setHorarios((prev) => prev.filter((h) => h.id !== id));
+    } catch (err) { setError(err.message); }
   }
 
-  /* ── Cancelar cita ───────────────────────────────────────────── */
-  function cancelAppointment(id) {
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
-    );
-    notify("Cita cancelada");
+  // ── Citas ───────────────────────────────────────────────────────
+  async function handleCancelarCita(cita) {
+    try {
+      await updateCita(cita.id, {
+        id_horario: cita.id_horario,
+        fecha:      cita.fecha,
+        motivo:     cita.motivo,
+        id_estado:  ID_ESTADO_CANCELADA,
+      });
+      notify("Cita cancelada");
+      const c = await getCitas();
+      setCitas(c);
+    } catch (err) { setError(err.message); }
   }
 
-  /* ── Helpers ─────────────────────────────────────────────────── */
-  const subjectOf = (id) => subjects.find((s) => s.id === id);
-  const teacherOf = (id) => teachers.find((t) => t.id === id);
-  const activeAppts = appointments.filter((a) => a.status !== "cancelled");
+  async function handleEliminarCita(id) {
+    if (!confirm("¿Eliminar esta cita permanentemente?")) return;
+    try {
+      await deleteCita(id);
+      notify("🗑️ Cita eliminada");
+      setCitas((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) { setError(err.message); }
+  }
+
+  const docentes   = usuarios.filter((u) => u.id_rol === 2 || u.rol === "Docente");
+  const activeAppts = citas.filter((c) => c.id_estado !== ID_ESTADO_CANCELADA);
 
   const ADMIN_TABS = [
-    { id: "overview", label: "📊 Resumen"           },
-    { id: "subjects", label: "📚 Asignaturas"       },
-    { id: "teachers", label: "👨‍🏫 Docentes"         },
-    { id: "appts",    label: "📅 Todas las citas"   },
+    { id: "overview", label: "📊 Resumen"         },
+    { id: "usuarios", label: "👥 Usuarios"        },
+    { id: "horarios", label: "🗓️ Horarios"        },
+    { id: "citas",    label: "📅 Todas las citas" },
   ];
+
+  if (loading) return (
+    <div className="page-wrapper">
+      <Header user={user} onLogout={logout} />
+      <Spinner text="Cargando panel de administración..." />
+    </div>
+  );
 
   return (
     <div className="page-wrapper">
-      <Header user={user} onLogout={onLogout} />
+      <Header user={user} onLogout={logout} />
 
       <div className="page-content">
-        {/* Notificación global */}
-        {notification && (
-          <div className="alert alert-success">{notification}</div>
-        )}
+        {notification && <div className="alert alert-success">{notification}</div>}
+        {error        && <div className="alert alert-danger" onClick={() => setError("")} style={{ cursor: "pointer" }}>{error} ✕</div>}
 
-        {/* Pestañas */}
         <div className="tab-bar">
           {ADMIN_TABS.map((t) => (
-            <button
-              key={t.id}
-              className={`tab-btn ${tab === t.id ? "active" : ""}`}
-              onClick={() => setTab(t.id)}
-            >
+            <button key={t.id} className={`tab-btn ${tab === t.id ? "active" : ""}`} onClick={() => { setTab(t.id); setError(""); }}>
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* ── PESTAÑA: RESUMEN ── */}
+        {/* ── RESUMEN ─────────────────────────────────────────── */}
         {tab === "overview" && (
           <>
             <div className="metrics-grid">
               {[
-                { label: "Asignaturas",  value: subjects.length,     icon: "📚", color: "var(--primary-dark)" },
-                { label: "Docentes",     value: teachers.length,     icon: "👨‍🏫", color: "#7c3aed"           },
-                { label: "Citas activas",value: activeAppts.length,  icon: "✅", color: "var(--success)"     },
-                { label: "Citas totales",value: appointments.length, icon: "📅", color: "var(--accent)"      },
+                { label: "Usuarios",     value: usuarios.length,    icon: "👥", color: "var(--primary-dark)" },
+                { label: "Horarios",     value: horarios.length,    icon: "🗓️", color: "#7c3aed"            },
+                { label: "Citas activas",value: activeAppts.length, icon: "✅", color: "var(--success)"     },
+                { label: "Citas totales",value: citas.length,       icon: "📅", color: "var(--accent)"      },
               ].map((stat) => (
-                <Card
-                  key={stat.label}
-                  className="metric-card"
-                  style={{ borderLeft: `4px solid ${stat.color}` }}
-                >
+                <Card key={stat.label} className="metric-card" style={{ borderLeft: `4px solid ${stat.color}` }}>
                   <div className="metric-card__top">
                     <div>
                       <p className="metric-card__label">{stat.label}</p>
-                      <p className="metric-card__value" style={{ color: stat.color }}>
-                        {stat.value}
-                      </p>
+                      <p className="metric-card__value" style={{ color: stat.color }}>{stat.value}</p>
                     </div>
-                    <span className="metric-card__icon" aria-hidden="true">
-                      {stat.icon}
-                    </span>
+                    <span className="metric-card__icon" aria-hidden="true">{stat.icon}</span>
                   </div>
                 </Card>
               ))}
             </div>
-
-            {/* Citas recientes */}
             <Card className="recent-card">
-              <h3 className="recent-card__title">Citas recientes</h3>
-              {[...appointments].reverse().slice(0, 5).map((appt) => {
-                const sub     = subjectOf(appt.subjectId);
-                const teacher = teacherOf(appt.teacherId);
-                return (
-                  <div key={appt.id} className="recent-row">
-                    <div className="recent-row__left">
-                      <span className="recent-row__icon" aria-hidden="true">
-                        {sub?.icon}
-                      </span>
-                      <div>
-                        <p className="recent-row__names">
-                          🎒 {appt.studentName} → 👨‍🏫 {teacher?.name}
-                        </p>
-                        <p className="recent-row__meta">
-                          {sub?.name} · {appt.slot}
-                        </p>
-                      </div>
+              <h3 className="recent-card__title">Últimas citas</h3>
+              {[...citas].reverse().slice(0, 5).map((c) => (
+                <div key={c.id} className="recent-row">
+                  <div className="recent-row__left">
+                    <span className="recent-row__icon" aria-hidden="true">📚</span>
+                    <div>
+                      <p className="recent-row__names">🎒 {c.estudiante} → 👨‍🏫 {c.docente}</p>
+                      <p className="recent-row__meta">{c.materia} · {c.fecha?.split("T")[0]}</p>
                     </div>
-                    <Badge variant={appt.status === "cancelled" ? "gray" : "success"}>
-                      {appt.status === "cancelled" ? "Cancelada" : "Confirmada"}
-                    </Badge>
                   </div>
-                );
-              })}
-              {appointments.length === 0 && (
-                <p className="empty-state" style={{ padding: "24px" }}>
-                  No hay citas aún.
-                </p>
-              )}
+                  <Badge variant={c.id_estado === ID_ESTADO_CANCELADA ? "gray" : "success"}>
+                    {c.estado}
+                  </Badge>
+                </div>
+              ))}
+              {citas.length === 0 && <p className="empty-state" style={{ padding: "20px" }}>No hay citas.</p>}
             </Card>
           </>
         )}
 
-        {/* ── PESTAÑA: ASIGNATURAS ── */}
-        {tab === "subjects" && (
+        {/* ── USUARIOS ────────────────────────────────────────── */}
+        {tab === "usuarios" && (
           <div className="two-col-grid">
-            {/* Formulario */}
             <Card className="form-card">
-              <h3 className="form-card__title">➕ Nueva asignatura</h3>
+              <h3 className="form-card__title">➕ Nuevo usuario</h3>
               <div className="form-fields">
-                <Input
-                  label="Nombre de la asignatura"
-                  value={newSubject.name}
-                  onChange={(e) => setNewSubject((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Ej: Química"
-                />
-
-                {/* Selector de icono */}
-                <div>
-                  <p className="field-label" style={{ marginBottom: "8px" }}>Icono</p>
-                  <div className="icon-picker">
-                    {ICON_OPTIONS.map((icon) => (
-                      <button
-                        key={icon}
-                        className={`icon-option ${newSubject.icon === icon ? "selected" : ""}`}
-                        onClick={() => setNewSubject((p) => ({ ...p, icon }))}
-                        aria-label={`Seleccionar icono ${icon}`}
-                      >
-                        {icon}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Selector de color */}
-                <div>
-                  <p className="field-label" style={{ marginBottom: "8px" }}>Color</p>
-                  <div className="color-picker">
-                    {COLOR_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.color}
-                        className="color-swatch"
-                        style={{
-                          background:   opt.color,
-                          borderColor:  newSubject.color === opt.color ? "var(--text)" : "transparent",
-                        }}
-                        onClick={() => setNewSubject((p) => ({ ...p, color: opt.color, bg: opt.bg }))}
-                        aria-label={`Seleccionar color ${opt.color}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <Btn onClick={addSubject} disabled={!newSubject.name.trim()}>
-                  Añadir asignatura
-                </Btn>
+                <Input label="Nombre completo" value={newUser.nombre} onChange={(e) => setNewUser((p) => ({ ...p, nombre: e.target.value }))} placeholder="Nombre Apellido" />
+                <Input label="Correo electrónico" type="email" value={newUser.email} onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))} placeholder="usuario@edu.co" />
+                <Input label="Contraseña" type="password" value={newUser.password} onChange={(e) => setNewUser((p) => ({ ...p, password: e.target.value }))} placeholder="••••••••" />
+                <Select label="Rol" value={newUser.id_rol} onChange={(e) => setNewUser((p) => ({ ...p, id_rol: e.target.value }))}>
+                  <option value="">Seleccionar rol</option>
+                  {roles.map((r) => <option key={r.id} value={r.id}>{r.nombre}</option>)}
+                </Select>
+                <Btn onClick={handleCreateUser}>Crear usuario</Btn>
               </div>
             </Card>
-
-            {/* Lista */}
             <div>
-              <h3 className="items-list__title">
-                Asignaturas ({subjects.length})
-              </h3>
+              <h3 className="items-list__title">Usuarios ({usuarios.length})</h3>
               <div className="items-list">
-                {subjects.map((sub) => (
-                  <Card
-                    key={sub.id}
-                    className="item-row"
-                    style={{ borderLeft: `4px solid ${sub.color}` }}
-                  >
+                {usuarios.map((u) => (
+                  <Card key={u.id} className="item-row">
                     <div className="item-row__left">
-                      <span className="item-row__icon" aria-hidden="true">
-                        {sub.icon}
-                      </span>
+                      <div className="admin-teacher-avatar" aria-hidden="true">
+                        {u.nombre?.slice(0, 2).toUpperCase()}
+                      </div>
                       <div>
-                        <p className="item-row__name">{sub.name}</p>
-                        <p className="item-row__sub">
-                          {teachers.filter((t) => t.subjectId === sub.id).length} docente(s)
-                        </p>
+                        <p className="item-row__name">{u.nombre}</p>
+                        <p className="item-row__sub">{u.rol} · {u.email}</p>
                       </div>
                     </div>
-                    <Btn variant="ghost" size="sm" onClick={() => deleteSubject(sub.id)}>
-                      🗑️
-                    </Btn>
+                    <Btn variant="ghost" size="sm" onClick={() => handleDeleteUser(u.id)}>🗑️</Btn>
                   </Card>
                 ))}
               </div>
@@ -261,146 +266,88 @@ export default function AdminView({
           </div>
         )}
 
-        {/* ── PESTAÑA: DOCENTES ── */}
-        {tab === "teachers" && (
+        {/* ── HORARIOS ────────────────────────────────────────── */}
+        {tab === "horarios" && (
           <div className="two-col-grid">
-            {/* Formulario */}
             <Card className="form-card">
-              <h3 className="form-card__title">➕ Nuevo docente</h3>
+              <h3 className="form-card__title">➕ Nuevo horario</h3>
               <div className="form-fields">
-                <Input
-                  label="Nombre completo"
-                  value={newTeacher.name}
-                  onChange={(e) => setNewTeacher((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Prof. Apellido"
-                />
-                <Input
-                  label="Correo electrónico"
-                  type="email"
-                  value={newTeacher.email}
-                  onChange={(e) => setNewTeacher((p) => ({ ...p, email: e.target.value }))}
-                  placeholder="docente@edu.co"
-                />
-                <Select
-                  label="Asignatura"
-                  value={newTeacher.subjectId}
-                  onChange={(e) => setNewTeacher((p) => ({ ...p, subjectId: e.target.value }))}
-                >
-                  <option value="">Seleccionar asignatura</option>
-                  {subjects.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.icon} {s.name}
-                    </option>
-                  ))}
+                <Select label="Docente" value={newHorario.id_docente} onChange={(e) => setNewHorario((p) => ({ ...p, id_docente: e.target.value }))}>
+                  <option value="">Seleccionar docente</option>
+                  {docentes.map((d) => <option key={d.id} value={d.id}>{d.nombre}</option>)}
                 </Select>
-                <Btn
-                  onClick={addTeacher}
-                  disabled={
-                    !newTeacher.name.trim() ||
-                    !newTeacher.email.trim() ||
-                    !newTeacher.subjectId
-                  }
-                >
-                  Añadir docente
-                </Btn>
+                <Select label="Materia" value={newHorario.id_materia} onChange={(e) => setNewHorario((p) => ({ ...p, id_materia: e.target.value }))}>
+                  <option value="">Seleccionar materia</option>
+                  {materias.map((m) => <option key={m.id} value={m.id}>{m.nombre}</option>)}
+                </Select>
+                <Select label="Día de la semana" value={newHorario.dia_semana} onChange={(e) => setNewHorario((p) => ({ ...p, dia_semana: e.target.value }))}>
+                  <option value="">Seleccionar día</option>
+                  {DIAS.map((d, i) => <option key={i + 1} value={i + 1}>{d}</option>)}
+                </Select>
+                <Input label="Hora inicio" type="time" value={newHorario.hora_inicio} onChange={(e) => setNewHorario((p) => ({ ...p, hora_inicio: e.target.value }))} />
+                <Input label="Hora fin"    type="time" value={newHorario.hora_fin}    onChange={(e) => setNewHorario((p) => ({ ...p, hora_fin:    e.target.value }))} />
+                <Btn onClick={handleCreateHorario}>Crear horario</Btn>
               </div>
             </Card>
-
-            {/* Lista */}
             <div>
-              <h3 className="items-list__title">Docentes ({teachers.length})</h3>
+              <h3 className="items-list__title">Horarios ({horarios.length})</h3>
               <div className="items-list">
-                {teachers.map((teacher) => {
-                  const sub = subjectOf(teacher.subjectId);
-                  return (
-                    <Card key={teacher.id} className="item-row">
-                      <div className="item-row__left">
-                        <div className="admin-teacher-avatar" aria-hidden="true">
-                          {teacher.initials}
-                        </div>
-                        <div>
-                          <p className="item-row__name">{teacher.name}</p>
-                          <p className="item-row__sub">
-                            {sub?.icon} {sub?.name} · {teacher.email}
-                          </p>
-                        </div>
+                {horarios.map((h) => (
+                  <Card key={h.id} className="item-row">
+                    <div className="item-row__left">
+                      <span className="item-row__icon" aria-hidden="true">🗓️</span>
+                      <div>
+                        <p className="item-row__name">{h.docente}</p>
+                        <p className="item-row__sub">
+                          {h.materia} · {DIAS[h.dia_semana - 1] ?? h.dia_semana} {h.hora_inicio}–{h.hora_fin}
+                        </p>
                       </div>
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteTeacher(teacher.id)}
-                      >
-                        🗑️
-                      </Btn>
-                    </Card>
-                  );
-                })}
+                    </div>
+                    <Btn variant="ghost" size="sm" onClick={() => handleDeleteHorario(h.id)}>🗑️</Btn>
+                  </Card>
+                ))}
               </div>
             </div>
           </div>
         )}
 
-        {/* ── PESTAÑA: TODAS LAS CITAS ── */}
-        {tab === "appts" && (
+        {/* ── TODAS LAS CITAS ─────────────────────────────────── */}
+        {tab === "citas" && (
           <>
             <div className="all-appts-header">
-              <h3 className="all-appts-header__title">
-                Todas las citas ({appointments.length})
-              </h3>
+              <h3 className="all-appts-header__title">Todas las citas ({citas.length})</h3>
               <div className="all-appts-header__badges">
                 <Badge variant="success">Activas: {activeAppts.length}</Badge>
-                <Badge variant="gray">
-                  Canceladas: {appointments.length - activeAppts.length}
-                </Badge>
+                <Badge variant="gray">Canceladas: {citas.length - activeAppts.length}</Badge>
               </div>
             </div>
-
-            {appointments.length === 0 ? (
-              <Card>
-                <p className="empty-state">No hay citas registradas.</p>
-              </Card>
+            {citas.length === 0 ? (
+              <Card><p className="empty-state">No hay citas registradas.</p></Card>
             ) : (
               <div className="all-appts-list">
-                {appointments.map((appt) => {
-                  const sub     = subjectOf(appt.subjectId);
-                  const teacher = teacherOf(appt.teacherId);
+                {citas.map((c) => {
+                  const cancelada = c.id_estado === ID_ESTADO_CANCELADA;
                   return (
                     <Card
-                      key={appt.id}
-                      className={`all-appt-row ${appt.status === "cancelled" ? "all-appt-row--cancelled" : ""}`}
-                      style={{
-                        borderLeft: `4px solid ${sub?.color ?? "var(--border)"}`,
-                      }}
+                      key={c.id}
+                      className={`all-appt-row ${cancelada ? "all-appt-row--cancelled" : ""}`}
+                      style={{ borderLeft: `4px solid var(--primary-dark)` }}
                     >
                       <div className="all-appt-row__left">
-                        <span className="all-appt-row__icon" aria-hidden="true">
-                          {sub?.icon}
-                        </span>
+                        <span className="all-appt-row__icon" aria-hidden="true">📚</span>
                         <div>
-                          <p className="all-appt-row__names">
-                            🎒 {appt.studentName} → 👨‍🏫 {teacher?.name}
-                          </p>
+                          <p className="all-appt-row__names">🎒 {c.estudiante} → 👨‍🏫 {c.docente}</p>
                           <p className="all-appt-row__meta">
-                            {sub?.name} · 🕐 {appt.slot}
+                            {c.materia} · 📅 {c.fecha?.split("T")[0]} · 🕐 {c.hora_inicio}–{c.hora_fin}
                           </p>
                         </div>
                       </div>
-
                       <div className="all-appt-row__right">
-                        <Badge
-                          variant={appt.status === "cancelled" ? "gray" : "success"}
-                        >
-                          {appt.status === "cancelled" ? "Cancelada" : "Confirmada"}
-                        </Badge>
-                        {appt.status !== "cancelled" && (
-                          <Btn
-                            variant="danger"
-                            size="sm"
-                            onClick={() => cancelAppointment(appt.id)}
-                          >
-                            Cancelar
-                          </Btn>
+                        <Badge variant={cancelada ? "gray" : "success"}>{c.estado}</Badge>
+                        {!cancelada && (
+                          <Btn variant="danger" size="sm" onClick={() => handleCancelarCita(c)}>Cancelar</Btn>
                         )}
+                        <Btn variant="ghost" size="sm" onClick={() => handleEliminarCita(c.id)}>🗑️</Btn>
                       </div>
                     </Card>
                   );

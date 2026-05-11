@@ -1,295 +1,345 @@
-import { useState } from "react";
-import { TIME_SLOTS } from "../data/constants";
-import Header from "../components/Header";
-import Card   from "../components/ui/Card";
-import Badge  from "../components/ui/Badge";
-import Btn    from "../components/ui/Btn";
+/**
+ * StudentView.jsx — Panel del estudiante.
+ *
+ * Endpoints usados:
+ *   GET  /api/catalogos/materias
+ *   GET  /api/horarios/materia/:id  → docentes y slots disponibles
+ *   GET  /api/citas                 → filtradas por id_estudiante
+ *   POST /api/citas                 → reservar cita
+ *   PUT  /api/citas/:id             → cancelar cita (cambiar estado)
+ */
+import { useState, useEffect } from "react";
+import { useAuth }            from "../context/AuthContext";
+import { getMaterias, getHorariosByMateria, getCitas, createCita, updateCita } from "../services/api";
+import Header  from "../components/Header";
+import Card    from "../components/ui/Card";
+import Badge   from "../components/ui/Badge";
+import Btn     from "../components/ui/Btn";
+import Input   from "../components/ui/Input";
+import Spinner from "../components/ui/Spinner";
 import "../styles/student.css";
 
-/**
- * Devuelve true si el slot está ocupado para el docente dado.
- */
-function isSlotTaken(appointments, teacherId, slot) {
-  return appointments.some(
-    (a) => a.teacherId === teacherId && a.slot === slot && a.status !== "cancelled"
-  );
-}
+const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
-/**
- * StudentView — panel completo del estudiante.
- * Pestañas: "Solicitar asesoría" | "Mis citas"
- */
-export default function StudentView({
-  user, subjects, teachers, appointments, setAppointments, onLogout,
-}) {
-  const [tab,             setTab]             = useState("book");
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [selectedTeacher, setSelectedTeacher] = useState(null);
-  const [selectedSlot,    setSelectedSlot]    = useState(null);
-  const [slotError,       setSlotError]       = useState("");
-  const [successMsg,      setSuccessMsg]       = useState("");
+// Paleta de colores cíclica para las materias
+const PALETTE = [
+  { color: "#3b82f6", bg: "#eff6ff" },
+  { color: "#0d9488", bg: "#f0fdfa" },
+  { color: "#10b981", bg: "#ecfdf5" },
+  { color: "#8b5cf6", bg: "#f5f3ff" },
+  { color: "#f59e0b", bg: "#fffbeb" },
+  { color: "#ec4899", bg: "#fdf2f8" },
+];
 
-  const myAppointments   = appointments.filter((a) => a.studentId === user.id);
-  const activeCount      = myAppointments.filter((a) => a.status !== "cancelled").length;
-  const subjectTeachers  = selectedSubject
-    ? teachers.filter((t) => t.subjectId === selectedSubject.id)
-    : [];
+// id_estado 3 = Cancelada (según schema del backend)
+const ID_ESTADO_CANCELADA = 3;
 
-  function handleSubjectSelect(sub) {
-    setSelectedSubject(sub);
-    setSelectedTeacher(null);
-    setSelectedSlot(null);
-    setSlotError("");
+export default function StudentView() {
+  const { user, logout } = useAuth();
+
+  // Datos del backend
+  const [materias,  setMaterias]  = useState([]);
+  const [horarios,  setHorarios]  = useState([]);
+  const [misCitas,  setMisCitas]  = useState([]);
+
+  // Flujo de reserva
+  const [selectedMateria,  setSelectedMateria]  = useState(null);
+  const [selectedHorario,  setSelectedHorario]  = useState(null);
+  const [fecha,            setFecha]            = useState("");
+  const [motivo,           setMotivo]           = useState("");
+
+  // UI
+  const [tab,          setTab]          = useState("book");
+  const [loadingMat,   setLoadingMat]   = useState(true);
+  const [loadingHor,   setLoadingHor]   = useState(false);
+  const [loadingCitas, setLoadingCitas] = useState(true);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState("");
+  const [successMsg,   setSuccessMsg]   = useState("");
+
+  // ── Carga inicial ──────────────────────────────────────────────
+  useEffect(() => {
+    getMaterias()
+      .then(setMaterias)
+      .catch(() => setError("No se pudieron cargar las materias."))
+      .finally(() => setLoadingMat(false));
+  }, []);
+
+  useEffect(() => {
+    fetchMisCitas();
+  }, []);
+
+  async function fetchMisCitas() {
+    setLoadingCitas(true);
+    try {
+      const all = await getCitas();
+      setMisCitas(all.filter((c) => c.id_estudiante === user.id));
+    } catch {
+      setError("No se pudieron cargar tus citas.");
+    } finally {
+      setLoadingCitas(false);
+    }
   }
 
-  function handleSlotSelect(teacher, slot) {
-    if (isSlotTaken(appointments, teacher.id, slot)) return;
-    setSelectedTeacher(teacher);
-    setSelectedSlot(slot);
-    setSlotError("");
+  // ── Selección de materia ───────────────────────────────────────
+  async function handleSelectMateria(materia) {
+    setSelectedMateria(materia);
+    setSelectedHorario(null);
+    setFecha("");
+    setMotivo("");
+    setError("");
+    setLoadingHor(true);
+    try {
+      const data = await getHorariosByMateria(materia.id);
+      setHorarios(data);
+    } catch {
+      setError("No se pudieron cargar los horarios de esta materia.");
+    } finally {
+      setLoadingHor(false);
+    }
   }
 
-  function handleBook() {
-    if (!selectedSlot || !selectedTeacher) return;
-
-    // Verificación final de disponibilidad
-    if (isSlotTaken(appointments, selectedTeacher.id, selectedSlot)) {
-      setSlotError("⚠️ Este horario ya está ocupado. Por favor elige otro.");
-      setSelectedSlot(null);
+  // ── Reservar cita ──────────────────────────────────────────────
+  async function handleReservar() {
+    if (!selectedHorario || !fecha || !motivo.trim()) {
+      setError("Completa todos los campos: horario, fecha y motivo.");
       return;
     }
-
-    const newAppt = {
-      id:          Date.now(),
-      studentId:   user.id,
-      studentName: user.name,
-      teacherId:   selectedTeacher.id,
-      subjectId:   selectedSubject.id,
-      slot:        selectedSlot,
-      status:      "confirmed",
-    };
-
-    setAppointments((prev) => [...prev, newAppt]);
-    setSuccessMsg(
-      `✅ Cita confirmada con ${selectedTeacher.name} — ${selectedSlot}`
-    );
-    // Reiniciar flujo
-    setSelectedSubject(null);
-    setSelectedTeacher(null);
-    setSelectedSlot(null);
-    setSlotError("");
-    setTimeout(() => setSuccessMsg(""), 5000);
+    setSaving(true);
+    setError("");
+    try {
+      await createCita({
+        id_estudiante: user.id,
+        id_horario:    selectedHorario.id,
+        fecha,
+        motivo,
+      });
+      setSuccessMsg(`✅ Cita reservada con ${selectedHorario.docente} — ${fecha}`);
+      setSelectedMateria(null);
+      setSelectedHorario(null);
+      setFecha("");
+      setMotivo("");
+      fetchMisCitas();
+      setTimeout(() => setSuccessMsg(""), 5000);
+    } catch (err) {
+      // El backend devuelve 409 cuando el horario ya está ocupado
+      if (err.message.includes("disponible") || err.message.includes("disponibilidad")) {
+        setError("⚠️ Este horario ya está ocupado en esa fecha. Elige otro horario o fecha.");
+      } else {
+        setError(err.message);
+      }
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleCancelMyAppt(id) {
-    setAppointments((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, status: "cancelled" } : a))
-    );
+  // ── Cancelar cita ──────────────────────────────────────────────
+  async function handleCancelar(cita) {
+    try {
+      await updateCita(cita.id, {
+        id_horario: cita.id_horario,
+        fecha:      cita.fecha,
+        motivo:     cita.motivo,
+        id_estado:  ID_ESTADO_CANCELADA,
+      });
+      fetchMisCitas();
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   function handleTabChange(newTab) {
     setTab(newTab);
-    setSelectedSubject(null);
-    setSelectedTeacher(null);
-    setSelectedSlot(null);
-    setSlotError("");
+    setSelectedMateria(null);
+    setSelectedHorario(null);
+    setError("");
   }
 
-  const subjectOf = (id) => subjects.find((s) => s.id === id);
-  const teacherOf = (id) => teachers.find((t) => t.id === id);
+  const activasCount = misCitas.filter((c) => c.id_estado !== ID_ESTADO_CANCELADA).length;
 
   return (
     <div className="page-wrapper">
-      <Header user={user} onLogout={onLogout} />
+      <Header user={user} onLogout={logout} />
 
       <div className="page-content">
-        {/* Notificación de éxito */}
-        {successMsg && (
-          <div className="alert alert-success">{successMsg}</div>
-        )}
+        {successMsg && <div className="alert alert-success">{successMsg}</div>}
+        {error      && <div className="alert alert-danger">{error}</div>}
 
         {/* Pestañas */}
         <div className="tab-bar">
-          <button
-            className={`tab-btn ${tab === "book" ? "active" : ""}`}
-            onClick={() => handleTabChange("book")}
-          >
+          <button className={`tab-btn ${tab === "book" ? "active" : ""}`} onClick={() => handleTabChange("book")}>
             📅 Solicitar asesoría
           </button>
-          <button
-            className={`tab-btn ${tab === "my" ? "active" : ""}`}
-            onClick={() => handleTabChange("my")}
-          >
-            📋 Mis citas ({activeCount})
+          <button className={`tab-btn ${tab === "my" ? "active" : ""}`} onClick={() => handleTabChange("my")}>
+            📋 Mis citas ({activasCount})
           </button>
         </div>
 
-        {/* ── PESTAÑA: Solicitar asesoría ── */}
+        {/* ── PESTAÑA: Solicitar ─────────────────────────────── */}
         {tab === "book" && (
           <>
-            {/* Paso 1 — elegir asignatura */}
+            {/* Paso 1 — Materia */}
             <div style={{ marginBottom: "28px" }}>
               <div className="step-header">
-                <div className={`step-badge step-badge--active`}>1</div>
-                <h2 className="step-title">Elige una asignatura</h2>
+                <div className="step-badge step-badge--active">1</div>
+                <h2 className="step-title">Elige una materia</h2>
               </div>
 
-              <div className="subject-grid">
-                {subjects.map((sub) => {
-                  const isSelected = selectedSubject?.id === sub.id;
-                  return (
-                    <button
-                      key={sub.id}
-                      className={`subject-card ${isSelected ? "selected" : ""}`}
-                      onClick={() => handleSubjectSelect(sub)}
-                      style={{
-                        borderColor: isSelected ? sub.color : undefined,
-                        background:  isSelected ? sub.bg   : undefined,
-                      }}
-                    >
-                      <span className="subject-card__icon" aria-hidden="true">
-                        {sub.icon}
-                      </span>
-                      <span
-                        className="subject-card__name"
-                        style={{ color: isSelected ? sub.color : undefined }}
+              {loadingMat ? (
+                <Spinner text="Cargando materias..." />
+              ) : (
+                <div className="subject-grid">
+                  {materias.map((mat, i) => {
+                    const palette   = PALETTE[i % PALETTE.length];
+                    const isSelected = selectedMateria?.id === mat.id;
+                    return (
+                      <button
+                        key={mat.id}
+                        className={`subject-card ${isSelected ? "selected" : ""}`}
+                        onClick={() => handleSelectMateria(mat)}
+                        style={{
+                          borderColor: isSelected ? palette.color : undefined,
+                          background:  isSelected ? palette.bg   : undefined,
+                        }}
                       >
-                        {sub.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        <span className="subject-card__icon" aria-hidden="true">📚</span>
+                        <span
+                          className="subject-card__name"
+                          style={{ color: isSelected ? palette.color : undefined }}
+                        >
+                          {mat.nombre}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Paso 2 — elegir docente y horario */}
-            {selectedSubject && (
-              <div>
+            {/* Paso 2 — Horario */}
+            {selectedMateria && (
+              <div style={{ marginBottom: "28px" }}>
                 <div className="step-header">
                   <div className="step-badge step-badge--active">2</div>
                   <h2 className="step-title">
-                    Elige docente y horario —{" "}
-                    <span style={{ color: selectedSubject.color }}>
-                      {selectedSubject.icon} {selectedSubject.name}
-                    </span>
+                    Elige un horario — <span style={{ color: "#0d9488" }}>{selectedMateria.nombre}</span>
                   </h2>
                 </div>
 
-                <div className="teacher-grid">
-                  {subjectTeachers.map((teacher) => (
-                    <Card
-                      key={teacher.id}
-                      className={`teacher-card ${selectedTeacher?.id === teacher.id ? "teacher-card--selected" : ""}`}
-                    >
-                      <div className="teacher-card__header">
-                        <div className="teacher-avatar" aria-hidden="true">
-                          {teacher.initials}
-                        </div>
-                        <div>
-                          <p className="teacher-card__name">{teacher.name}</p>
-                          <p className="teacher-card__email">{teacher.email}</p>
-                        </div>
-                      </div>
+                {loadingHor ? (
+                  <Spinner text="Cargando horarios..." />
+                ) : horarios.length === 0 ? (
+                  <Card><p className="empty-state">No hay horarios disponibles para esta materia.</p></Card>
+                ) : (
+                  <div className="teacher-grid">
+                    {horarios.map((h) => {
+                      const isSelected = selectedHorario?.id === h.id;
+                      return (
+                        <Card
+                          key={h.id}
+                          className={`teacher-card ${isSelected ? "teacher-card--selected" : ""}`}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => { setSelectedHorario(h); setError(""); }}
+                        >
+                          <div className="teacher-card__header">
+                            <div className="teacher-avatar" aria-hidden="true">
+                              {h.docente?.slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="teacher-card__name">{h.docente}</p>
+                              <p className="teacher-card__email">
+                                {DIAS[h.dia_semana - 1] ?? `Día ${h.dia_semana}`} · {h.hora_inicio} – {h.hora_fin}
+                              </p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <p style={{ fontSize: "12px", color: "var(--primary-dark)", fontWeight: 600 }}>
+                              ✓ Seleccionado
+                            </p>
+                          )}
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
-                      <p className="slots-label">HORARIOS DISPONIBLES</p>
-                      <div className="slots-list">
-                        {TIME_SLOTS.map((slot) => {
-                          const taken    = isSlotTaken(appointments, teacher.id, slot);
-                          const selected =
-                            selectedTeacher?.id === teacher.id &&
-                            selectedSlot === slot;
-                          return (
-                            <button
-                              key={slot}
-                              className={`slot-btn ${
-                                taken
-                                  ? "slot-btn--taken"
-                                  : selected
-                                  ? "slot-btn--selected"
-                                  : ""
-                              }`}
-                              onClick={() => handleSlotSelect(teacher, slot)}
-                              disabled={taken}
-                              title={taken ? "Este horario ya está ocupado" : ""}
-                            >
-                              {taken ? "🔒 " : ""}
-                              {slot}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </Card>
-                  ))}
+            {/* Paso 3 — Fecha y motivo */}
+            {selectedHorario && (
+              <div>
+                <div className="step-header">
+                  <div className="step-badge step-badge--active">3</div>
+                  <h2 className="step-title">Completa los detalles</h2>
                 </div>
-
-                {/* Error de slot ocupado */}
-                {slotError && (
-                  <div className="alert alert-danger" style={{ marginTop: "16px" }}>
-                    {slotError}
-                  </div>
-                )}
-
-                {/* Panel de confirmación */}
-                {selectedTeacher && selectedSlot && (
-                  <div className="confirm-panel">
-                    <div>
-                      <p className="confirm-panel__title">📅 Confirmar cita</p>
-                      <p className="confirm-panel__detail">
-                        {selectedSubject.name} · {selectedTeacher.name} · {selectedSlot}
-                      </p>
+                <Card style={{ padding: "20px", maxWidth: "480px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                    <Input
+                      label="Fecha de la asesoría"
+                      type="date"
+                      value={fecha}
+                      onChange={(e) => setFecha(e.target.value)}
+                      min={new Date().toISOString().split("T")[0]}
+                    />
+                    <div className="input-wrapper">
+                      <label className="field-label">Motivo / tema a tratar</label>
+                      <textarea
+                        className="input-field"
+                        rows={3}
+                        placeholder="Ej: Dudas sobre ecuaciones diferenciales..."
+                        value={motivo}
+                        onChange={(e) => setMotivo(e.target.value)}
+                        style={{ resize: "vertical" }}
+                      />
                     </div>
-                    <Btn onClick={handleBook}>Confirmar reserva ✓</Btn>
+                    <Btn onClick={handleReservar} disabled={saving}>
+                      {saving ? "Reservando..." : "Confirmar reserva ✓"}
+                    </Btn>
                   </div>
-                )}
+                </Card>
               </div>
             )}
           </>
         )}
 
-        {/* ── PESTAÑA: Mis citas ── */}
+        {/* ── PESTAÑA: Mis citas ──────────────────────────────── */}
         {tab === "my" && (
           <>
             <h2 className="view-title">Mis citas de asesoría</h2>
-
-            {myAppointments.length === 0 ? (
-              <Card>
-                <p className="empty-state">No tienes citas registradas aún.</p>
-              </Card>
+            {loadingCitas ? (
+              <Spinner />
+            ) : misCitas.length === 0 ? (
+              <Card><p className="empty-state">No tienes citas registradas aún.</p></Card>
             ) : (
               <div className="appt-list">
-                {myAppointments.map((appt) => {
-                  const sub     = subjectOf(appt.subjectId);
-                  const teacher = teacherOf(appt.teacherId);
+                {misCitas.map((cita) => {
+                  const cancelada = cita.id_estado === ID_ESTADO_CANCELADA;
                   return (
                     <Card
-                      key={appt.id}
-                      className={`appt-row ${appt.status === "cancelled" ? "appt-row--cancelled" : ""}`}
-                      style={{ borderLeft: `4px solid ${appt.status === "cancelled" ? "var(--text-light)" : sub?.color ?? "var(--primary-dark)"}` }}
+                      key={cita.id}
+                      className={`appt-row ${cancelada ? "appt-row--cancelled" : ""}`}
+                      style={{ borderLeft: `4px solid ${cancelada ? "var(--text-light)" : "var(--primary-dark)"}` }}
                     >
                       <div className="appt-row__left">
-                        <span className="appt-row__icon" aria-hidden="true">
-                          {sub?.icon}
-                        </span>
+                        <span className="appt-row__icon" aria-hidden="true">📚</span>
                         <div>
-                          <p className="appt-row__name">{sub?.name}</p>
+                          <p className="appt-row__name">{cita.materia}</p>
                           <p className="appt-row__meta">
-                            👨‍🏫 {teacher?.name} · 🕐 {appt.slot}
+                            👨‍🏫 {cita.docente} · 📅 {cita.fecha?.split("T")[0]} · 🕐 {cita.hora_inicio} – {cita.hora_fin}
                           </p>
+                          {cita.motivo && (
+                            <p className="appt-row__meta" style={{ marginTop: "2px" }}>
+                              💬 {cita.motivo}
+                            </p>
+                          )}
                         </div>
                       </div>
-
                       <div className="appt-row__right">
-                        <Badge
-                          variant={appt.status === "cancelled" ? "gray" : "success"}
-                        >
-                          {appt.status === "cancelled" ? "Cancelada" : "Confirmada"}
+                        <Badge variant={cancelada ? "gray" : "success"}>
+                          {cita.estado}
                         </Badge>
-                        {appt.status !== "cancelled" && (
-                          <Btn
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleCancelMyAppt(appt.id)}
-                          >
+                        {!cancelada && (
+                          <Btn variant="danger" size="sm" onClick={() => handleCancelar(cita)}>
                             Cancelar
                           </Btn>
                         )}

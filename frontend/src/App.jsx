@@ -1,33 +1,22 @@
-import { useState } from "react";
-import { SUBJECTS_INIT, TEACHERS_INIT, APPOINTMENTS_INIT } from "./data/initialData";
-import LoginPage from "./pages/LoginPage";
-import StudentView from "./pages/StudentView";
-import TeacherView from "./pages/TeacherView";
-import AdminView from "./pages/AdminView";
+import { useAuth, ROLES } from "./context/AuthContext";
+import LoginPage    from "./pages/LoginPage";
+import StudentView  from "./pages/StudentView";
+import TeacherView  from "./pages/TeacherView";
+import AdminView    from "./pages/AdminView";
 
 export default function App() {
-  const [currentUser, setCurrentUser]   = useState(null);
-  const [subjects, setSubjects]         = useState(SUBJECTS_INIT);
-  const [teachers, setTeachers]         = useState(TEACHERS_INIT);
-  const [appointments, setAppointments] = useState(APPOINTMENTS_INIT);
+  const { user } = useAuth();
 
-  const handleLogout = () => setCurrentUser(null);
+  if (!user) return <LoginPage />;
 
-  if (!currentUser) {
-    return <LoginPage onLogin={setCurrentUser} />;
-  }
+  if (user.id_rol === ROLES.ESTUDIANTE) return <StudentView />;
+  if (user.id_rol === ROLES.DOCENTE)    return <TeacherView />;
+  if (user.id_rol === ROLES.ADMIN)      return <AdminView />;
 
-  const sharedProps = { subjects, teachers, appointments, setAppointments, onLogout: handleLogout };
-
-  if (currentUser.role === "student") return <StudentView user={currentUser} {...sharedProps} />;
-  if (currentUser.role === "teacher") return <TeacherView user={currentUser} {...sharedProps} />;
-
+  // Rol desconocido — muestra mensaje de error
   return (
-    <AdminView
-      user={currentUser}
-      setSubjects={setSubjects}
-      setTeachers={setTeachers}
-      {...sharedProps}
-    />
+    <div style={{ padding: "40px", textAlign: "center" }}>
+      <p>Rol no reconocido (id_rol: {user.id_rol}). Contacta al administrador.</p>
+    </div>
   );
 }
