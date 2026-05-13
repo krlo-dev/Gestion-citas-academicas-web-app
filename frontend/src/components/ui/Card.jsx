@@ -1,14 +1,8 @@
 import "../../styles/ui.css";
 
-/**
- * Card — superficie elevada genérica.
- * @param {string} className  - clases CSS adicionales
- * @param {object} style      - estilos inline extra (p.ej. border-left dinámico)
- * @param {React.ReactNode} children
- */
-export default function Card({ children, className = "", style }) {
+export default function Card({ children, className = "", style, onClick }) {
   return (
-    <div className={`card ${className}`} style={style}>
+    <div className={`card ${className}`} style={style} onClick={onClick}>
       {children}
     </div>
   );

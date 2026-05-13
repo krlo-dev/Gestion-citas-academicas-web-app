@@ -64,3 +64,5 @@ CREATE TABLE citas (
 INSERT INTO roles (nombre) VALUES ('Administrador'), ('Docente'), ('Estudiante');
 INSERT INTO estado_cita (nombre) VALUES ('Pendiente'), ('Confirmada'), ('Cancelada');
 INSERT INTO materias (nombre) VALUES ('Desarrollo Web'), ('Base de Datos'), ('Programación');
+INSERT INTO usuarios (nombre, email, password, id_rol) 
+VALUES ('Administrador', 'admin@edu.co', 'password', 1);

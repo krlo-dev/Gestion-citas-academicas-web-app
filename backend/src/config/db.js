@@ -1,9 +1,12 @@
-//db.js Gestiona la conexión a la db MySQL usando un pool reutilizable
-
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+dotenv.config({ path: join(__dirname, '../../.env') });
 
 export const pool = mysql.createPool({
     host: process.env.DB_HOST,
